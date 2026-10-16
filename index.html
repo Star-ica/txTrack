@@ -3,874 +3,339 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ContractTrack — Onchain Analytics Registry</title>
+<title>TxTrack — Onchain Analytics Registry</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
-    --border: #30363d; --accent: #58a6ff; --accent2: #3fb950;
-    --accent3: #f78166; --text: #e6edf3; --muted: #7d8590;
-    --danger: #f85149; --warning: #e3b341;
-    --radius: 6px; --font: 'Inter', system-ui, sans-serif;
-    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;
+    --accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#e3b341;
+    --text:#e6edf3;--muted:#7d8590;--radius:6px;
+    --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono','Fira Code',monospace;
   }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-padding-top: env(safe-area-inset-top,0px); }
-  body {
-    font-family: var(--font); background: var(--bg); color: var(--text);
-    min-height: 100vh;
-    padding-top: env(safe-area-inset-top,0);
-    padding-bottom: env(safe-area-inset-bottom,0);
-  }
-
-  header {
-    border-bottom: 1px solid var(--border); padding: 14px 28px;
-    display: flex; align-items: center; gap: 14px;
-    position: sticky; top: env(safe-area-inset-top,0);
-    background: var(--bg); z-index: 20;
-  }
-  .logo { font-family: var(--mono); font-size: 16px; font-weight: 700; }
-  .logo span { color: var(--accent); }
-  .logo em { font-style: normal; color: var(--muted); font-weight: 400; }
-  nav { margin-left: auto; display: flex; gap: 4px; }
-  .tab-btn {
-    background: none; border: 1px solid transparent; padding: 6px 14px;
-    border-radius: var(--radius); cursor: pointer; font-size: 13px;
-    color: var(--muted); font-family: var(--font); transition: all .15s;
-  }
-  .tab-btn.active { background: var(--surface); border-color: var(--border); color: var(--text); }
-  .tab-btn:hover:not(.active) { color: var(--text); }
-
-  main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
-  .section { display: none; }
-  .section.active { display: block; }
-
-  /* ── Search bar ── */
-  .search-wrap { margin-bottom: 32px; }
-  .search-wrap h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; letter-spacing: -.3px; }
-  .search-wrap p { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
-  .search-row { display: flex; gap: 8px; }
-  .search-input {
-    flex: 1; background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 11px 14px; color: var(--text);
-    font-family: var(--mono); font-size: 13px; outline: none; transition: border-color .15s;
-  }
-  .search-input:focus { border-color: var(--accent); }
-  .search-btn {
-    background: var(--accent); color: #000; border: none; padding: 11px 22px;
-    border-radius: var(--radius); cursor: pointer; font-weight: 700;
-    font-size: 14px; font-family: var(--font); white-space: nowrap;
-  }
-  .search-btn:hover { opacity: .88; }
-
-  /* ── Stats grid ── */
-  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
-  .stat-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 18px 16px;
-  }
-  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
-  .stat-value { font-size: 26px; font-weight: 800; font-family: var(--mono); line-height: 1; }
-  .stat-value.blue { color: var(--accent); }
-  .stat-value.green { color: var(--accent2); }
-  .stat-value.orange { color: var(--warning); }
-  .stat-value.red { color: var(--accent3); }
-  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
-
-  /* ── Activity feed ── */
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-  .panel-header {
-    padding: 14px 16px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .panel-title { font-size: 13px; font-weight: 600; }
-  .panel-body { padding: 0; }
-
-  .activity-row {
-    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-    border-bottom: 1px solid var(--border); font-size: 13px;
-  }
-  .activity-row:last-child { border-bottom: none; }
-  .act-icon {
-    width: 30px; height: 30px; border-radius: 50%; display: flex;
-    align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;
-  }
-  .act-icon.tx { background: rgba(88,166,255,.12); }
-  .act-icon.user { background: rgba(63,185,80,.12); }
-  .act-icon.event { background: rgba(227,179,65,.12); }
-  .act-main { flex: 1; }
-  .act-type { font-weight: 600; }
-  .act-addr { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-  .act-time { font-size: 11px; color: var(--muted); white-space: nowrap; font-family: var(--mono); }
-
-  /* ── Users table ── */
-  .user-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .user-table th {
-    text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border);
-    font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px;
-    font-weight: 600;
-  }
-  .user-table td { padding: 11px 16px; border-bottom: 1px solid var(--border); }
-  .user-table tr:last-child td { border-bottom: none; }
-  .user-table tr:hover td { background: var(--surface2); }
-  .mono { font-family: var(--mono); font-size: 12px; }
-  .addr-cell { color: var(--accent); font-family: var(--mono); font-size: 12px; }
-
-  /* ── Badge ── */
-  .badge {
-    display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px;
-    font-size: 11px; font-family: var(--mono); font-weight: 600;
-  }
-  .badge.green { background: rgba(63,185,80,.12); color: var(--accent2); border: 1px solid rgba(63,185,80,.2); }
-  .badge.blue { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.2); }
-  .badge.orange { background: rgba(227,179,65,.12); color: var(--warning); border: 1px solid rgba(227,179,65,.2); }
-
-  /* ── Register section ── */
-  .form-group { margin-bottom: 16px; }
-  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-family: var(--mono); }
-  input[type=text], input[type=number], select, textarea {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 10px 14px; color: var(--text);
-    font-family: var(--mono); font-size: 13px; outline: none; transition: border-color .15s;
-  }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-  textarea { resize: vertical; min-height: 70px; }
-  select option { background: var(--surface2); }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .btn {
-    border: none; padding: 10px 22px; border-radius: var(--radius);
-    cursor: pointer; font-weight: 700; font-size: 14px; font-family: var(--font);
-    transition: opacity .15s; width: 100%;
-  }
-  .btn:hover { opacity: .85; }
-  .btn.primary { background: var(--accent); color: #000; }
-  .btn.green { background: var(--accent2); color: #000; }
-  .btn.outline { background: none; color: var(--text); border: 1px solid var(--border); }
-  .btn-row { display: flex; gap: 8px; }
-  .btn-row .btn { flex: 1; }
-
-  /* ── Contract code ── */
-  .solidity-block {
-    background: #010409; border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 20px; overflow-x: auto; font-family: var(--mono); font-size: 12px;
-    line-height: 1.8; color: #cdd9e5;
-  }
-  .kw { color: #f97583; } .type { color: #79b8ff; } .fn { color: #b392f0; }
-  .str { color: #9ecbff; } .cm { color: #6a737d; font-style: italic; }
-  .copy-btn {
-    float: right; background: var(--surface2); border: none; color: var(--text);
-    padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;
-    font-family: var(--mono); margin-bottom: 8px;
-  }
-  .copy-btn:hover { background: var(--accent); color: #000; }
-
-  /* ── Misc ── */
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  #toast {
-    position: fixed; bottom: 24px; right: 24px; background: var(--surface2);
-    border: 1px solid var(--accent2); border-radius: var(--radius);
-    padding: 11px 16px; font-size: 13px; opacity: 0; pointer-events: none;
-    transition: opacity .2s; z-index: 100;
-  }
-  #toast.show { opacity: 1; }
-  .empty { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; }
-  .section-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-  .section-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
-  .info-row { display: flex; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
-  .info-row:last-child { border-bottom: none; }
-  .info-key { color: var(--muted); }
-  .info-val { font-family: var(--mono); font-size: 12px; }
-
-  /* recent contracts list */
-  .contract-item {
-    display: flex; align-items: center; gap: 14px; padding: 12px 16px;
-    border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s;
-  }
-  .contract-item:hover { background: var(--surface2); }
-  .contract-item:last-child { border-bottom: none; }
-  .ci-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); flex-shrink: 0; }
-  .ci-name { font-weight: 600; font-size: 14px; }
-  .ci-addr { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-  .ci-stats { margin-left: auto; text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
-
-  @media (max-width: 600px) {
-    .stats-grid { grid-template-columns: 1fr 1fr; }
-    .grid-2, .two-col { grid-template-columns: 1fr; }
-  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+  header{border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--bg);z-index:20}
+  .logo{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--accent)}
+  .logo em{font-style:normal;color:var(--muted);font-weight:400}
+  nav{margin-left:auto;display:flex;gap:4px}
+  .tab-btn{background:none;border:1px solid transparent;padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:13px;color:var(--muted);font-family:var(--font);transition:all .15s}
+  .tab-btn.active{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .wallet-btn{background:var(--accent);color:#000;border:none;padding:7px 16px;border-radius:var(--radius);cursor:pointer;font-weight:700;font-size:13px;font-family:var(--font);white-space:nowrap}
+  .wallet-btn.connected{background:var(--surface);color:var(--green);border:1px solid var(--green)}
+  main{max-width:860px;margin:0 auto;padding:28px 24px}
+  .section{display:none}.section.active{display:block}
+  .form-group{margin-bottom:14px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-family:var(--mono)}
+  input,textarea,select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .15s}
+  input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+  textarea{resize:vertical;min-height:72px}
+  select option{background:var(--surface)}
+  .btn{border:none;padding:10px 20px;border-radius:var(--radius);cursor:pointer;font-weight:700;font-size:14px;font-family:var(--font);transition:opacity .15s;width:100%}
+  .btn:hover{opacity:.85}.btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.primary{background:var(--accent);color:#000}
+  .btn.green{background:var(--green);color:#000}
+  .btn.outline{background:none;color:var(--text);border:1px solid var(--border)}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .stat-val{font-size:24px;font-weight:800;font-family:var(--mono)}
+  .stat-lbl{font-size:11px;color:var(--muted);margin-top:4px}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+  .panel-head{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px}
+  .row:last-child{border-bottom:none}
+  .mono{font-family:var(--mono);font-size:12px}
+  .addr{color:var(--accent);font-family:var(--mono);font-size:12px}
+  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-family:var(--mono);font-weight:600}
+  .badge.green{background:rgba(63,185,80,.12);color:var(--green);border:1px solid rgba(63,185,80,.2)}
+  .badge.blue{background:rgba(88,166,255,.12);color:var(--accent);border:1px solid rgba(88,166,255,.2)}
+  .network-bar{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.2);border-radius:var(--radius);padding:8px 14px;font-size:12px;color:var(--accent);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+  #toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 16px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100;max-width:340px}
+  #toast.show{opacity:1}
+  #toast.err{border-color:var(--red);color:var(--red)}
+  .h2{font-size:18px;font-weight:700;margin-bottom:4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+  .search-row{display:flex;gap:8px;margin-bottom:28px}
+  .search-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .15s}
+  .search-input:focus{border-color:var(--accent)}
+  .search-btn{background:var(--accent);color:#000;border:none;padding:11px 22px;border-radius:var(--radius);cursor:pointer;font-weight:700;font-family:var(--font)}
+  .tx-link{color:var(--accent);font-family:var(--mono);font-size:11px;text-decoration:none}
+  .tx-link:hover{text-decoration:underline}
+  @media(max-width:600px){.stats-grid{grid-template-columns:1fr 1fr}.grid-2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo"><span>Contract</span>Track<em>.sol</em></div>
+  <div class="logo">Tx<span style="color:var(--text)">Track</span><em>.sol</em></div>
   <nav>
-    <button class="tab-btn active" onclick="goTab('query', this)">Query</button>
-    <button class="tab-btn" onclick="goTab('register', this)">Register Contract</button>
-    <button class="tab-btn" onclick="goTab('log', this)">Log Activity</button>
-    <button class="tab-btn" onclick="goTab('code', this)">Contract Code</button>
+    <button class="tab-btn active" onclick="goTab('query',this)">Query</button>
+    <button class="tab-btn" onclick="goTab('register',this)">Register</button>
+    <button class="tab-btn" onclick="goTab('log',this)">Log Activity</button>
   </nav>
+  <button class="wallet-btn" id="wb" onclick="connectWallet()">Connect Wallet</button>
 </header>
-
 <main>
 
-  <!-- ═══════════════════════════════════════════
-       QUERY
-  ═══════════════════════════════════════════ -->
-  <section class="section active" id="query">
-    <div class="search-wrap">
-      <h1>Query any contract</h1>
-      <p>Enter a contract address to see its total users, unique wallets, transaction count, and full activity log — all stored onchain.</p>
-      <div class="search-row">
-        <input class="search-input" id="q-addr" placeholder="0x contract address..." onkeydown="if(event.key==='Enter')runQuery()" />
-        <button class="search-btn" onclick="runQuery()">Query</button>
-      </div>
-    </div>
-
-    <!-- recent contracts -->
-    <div id="recent-wrap">
-      <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">Registered contracts</span>
-          <span style="font-size:12px;color:var(--muted);" id="contract-count">0 contracts</span>
-        </div>
-        <div class="panel-body" id="contract-list">
-          <div class="empty">No contracts registered yet. Go to Register Contract to add yours.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- query result (hidden until search) -->
-    <div id="query-result" style="display:none; margin-top:28px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-        <div>
-          <div style="font-size:18px;font-weight:700;" id="r-name">—</div>
-          <div style="font-family:var(--mono);font-size:12px;color:var(--muted);" id="r-addr">—</div>
-        </div>
-        <span class="badge green" style="margin-left:auto;">Live</span>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total Users</div>
-          <div class="stat-value blue" id="r-total-users">0</div>
-          <div class="stat-sub">all registrations</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Unique Wallets</div>
-          <div class="stat-value green" id="r-unique">0</div>
-          <div class="stat-sub">distinct addresses</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Txs</div>
-          <div class="stat-value orange" id="r-txs">0</div>
-          <div class="stat-sub">logged interactions</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Events Emitted</div>
-          <div class="stat-value red" id="r-events">0</div>
-          <div class="stat-sub">onchain events</div>
-        </div>
-      </div>
-
-      <div class="two-col">
-        <!-- users table -->
-        <div class="panel">
-          <div class="panel-header"><span class="panel-title">Registered Users</span></div>
-          <div class="panel-body" style="overflow-x:auto;">
-            <table class="user-table" id="r-user-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Wallet</th>
-                  <th>Txs</th>
-                  <th>Joined</th>
-                </tr>
-              </thead>
-              <tbody id="r-user-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- activity feed -->
-        <div class="panel">
-          <div class="panel-header"><span class="panel-title">Activity Feed</span></div>
-          <div class="panel-body" id="r-feed"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════
-       REGISTER CONTRACT
-  ═══════════════════════════════════════════ -->
-  <section class="section" id="register">
-    <div class="section-title">Register a Contract</div>
-    <p class="section-sub">Add your project contract to the registry. Once registered, any wallet can call <code style="font-family:var(--mono);color:var(--accent)">logUser()</code> and <code style="font-family:var(--mono);color:var(--accent)">logTx()</code> to record activity, and anyone can query it publicly.</p>
-
-    <div class="form-group">
-      <label>Contract Address</label>
-      <input type="text" id="r-contract-addr" placeholder="0xabc...123 — the project contract you want to track" />
+<!-- QUERY -->
+<section class="section active" id="query">
+  <div class="h2">Query any contract</div>
+  <p class="sub">Enter a contract address to see its onchain analytics — stored and read directly from Botchain.</p>
+  <div class="search-row">
+    <input class="search-input" id="q-addr" placeholder="0x contract address..." />
+    <button class="search-btn" onclick="queryContract()">Query</button>
+  </div>
+  <div id="q-result" style="display:none">
+    <div class="network-bar"><div class="dot"></div><span id="q-name">—</span> &nbsp;·&nbsp; <span id="q-cat" style="color:var(--muted)">—</span></div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val" style="color:var(--accent)" id="q-tu">0</div><div class="stat-lbl">Total Users</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--green)" id="q-uw">0</div><div class="stat-lbl">Unique Wallets</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--yellow)" id="q-tx">0</div><div class="stat-lbl">Total Txs</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#f78166" id="q-ev">0</div><div class="stat-lbl">Events</div></div>
     </div>
     <div class="grid-2">
-      <div class="form-group">
-        <label>Project Name</label>
-        <input type="text" id="r-project-name" placeholder="FaucetDrops, HealFi, etc." />
+      <div class="panel"><div class="panel-head">Unique Wallets</div><div id="q-wallets"></div></div>
+      <div class="panel"><div class="panel-head">Recent Activity</div><div id="q-feed"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- REGISTER -->
+<section class="section" id="register">
+  <div class="h2">Register a Contract</div>
+  <p class="sub">Add your project to TxTrack. Once registered, anyone can push activity and query it publicly on Botchain.</p>
+  <div id="reg-network" class="network-bar" style="display:none"><div class="dot"></div>Connected to Botchain (Chain 968)</div>
+  <div class="form-group"><label>Contract Address to Track</label><input id="r-addr" placeholder="0x your project contract" /></div>
+  <div class="grid-2">
+    <div class="form-group"><label>Project Name</label><input id="r-name" placeholder="TxTrack, HealFi, etc." /></div>
+    <div class="form-group"><label>Category</label>
+      <select id="r-cat"><option value="">Select</option><option>DeFi</option><option>NFT</option><option>Gaming</option><option>DAO</option><option>Infrastructure</option><option>Social</option><option>Other</option></select>
+    </div>
+  </div>
+  <div class="form-group"><label>Description</label><textarea id="r-desc" placeholder="What does this contract do?"></textarea></div>
+  <button class="btn primary" id="r-btn" onclick="registerContract()">Register Contract</button>
+  <div id="r-tx" style="margin-top:12px;font-size:12px;display:none"></div>
+</section>
+
+<!-- LOG -->
+<section class="section" id="log">
+  <div class="h2">Log Activity</div>
+  <p class="sub">Push user interactions and transactions onchain. Any wallet can call these functions for a registered contract.</p>
+  <div class="grid-2">
+    <div class="panel" style="padding:18px">
+      <div style="font-weight:700;margin-bottom:4px">Log User</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Records a wallet against a contract. First call increments unique wallets.</div>
+      <div class="form-group"><label>Contract Address</label><input id="lu-c" placeholder="0x registered contract" /></div>
+      <div class="form-group"><label>Wallet Address</label><input id="lu-w" placeholder="0x user wallet" /></div>
+      <div class="form-group"><label>Event Type</label>
+        <select id="lu-t"><option>Registration</option><option>FirstTx</option><option>Deposit</option><option>Swap</option><option>Mint</option><option>Custom</option></select>
       </div>
-      <div class="form-group">
-        <label>Category</label>
-        <select id="r-category">
-          <option value="">Select</option>
-          <option>DeFi</option>
-          <option>NFT</option>
-          <option>Gaming</option>
-          <option>DAO</option>
-          <option>Infrastructure</option>
-          <option>Social</option>
-          <option>Other</option>
-        </select>
+      <button class="btn green" onclick="logUser()">Log User</button>
+      <div id="lu-tx" style="margin-top:10px;font-size:12px;display:none"></div>
+    </div>
+    <div class="panel" style="padding:18px">
+      <div style="font-weight:700;margin-bottom:4px">Log Transaction</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Records a transaction action from a wallet on a registered contract.</div>
+      <div class="form-group"><label>Contract Address</label><input id="lt-c" placeholder="0x registered contract" /></div>
+      <div class="form-group"><label>Wallet Address</label><input id="lt-w" placeholder="0x wallet" /></div>
+      <div class="form-group"><label>Action</label>
+        <select id="lt-a"><option>Transfer</option><option>Stake</option><option>Withdraw</option><option>Vote</option><option>Claim</option><option>Deposit</option><option>Mint</option><option>Custom</option></select>
       </div>
+      <button class="btn primary" onclick="logTx()">Log Transaction</button>
+      <div id="lt-tx" style="margin-top:10px;font-size:12px;display:none"></div>
     </div>
-    <div class="form-group">
-      <label>Description</label>
-      <textarea id="r-desc" placeholder="What does this contract do?"></textarea>
-    </div>
-    <button class="btn primary" onclick="registerContract()">Register Contract Onchain</button>
-  </section>
-
-  <!-- ═══════════════════════════════════════════
-       LOG ACTIVITY
-  ═══════════════════════════════════════════ -->
-  <section class="section" id="log">
-    <div class="section-title">Log Activity</div>
-    <p class="section-sub">Projects (or their users) call these functions to push activity data onchain. Anyone can then query it.</p>
-
-    <div class="two-col">
-      <div class="panel" style="padding:20px;">
-        <div style="font-weight:700;margin-bottom:4px;">Log a User</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Called when a new wallet interacts with a project contract for the first time.</div>
-        <div class="form-group">
-          <label>Contract Address</label>
-          <input type="text" id="lu-contract" placeholder="0x project contract" />
-        </div>
-        <div class="form-group">
-          <label>User Wallet</label>
-          <input type="text" id="lu-wallet" placeholder="0x user wallet" />
-        </div>
-        <div class="form-group">
-          <label>Event Type</label>
-          <select id="lu-type">
-            <option>Registration</option>
-            <option>First Tx</option>
-            <option>Deposit</option>
-            <option>Swap</option>
-            <option>Mint</option>
-            <option>Custom</option>
-          </select>
-        </div>
-        <button class="btn green" onclick="logUser()">Log User</button>
-      </div>
-
-      <div class="panel" style="padding:20px;">
-        <div style="font-weight:700;margin-bottom:4px;">Log a Transaction</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Records any onchain interaction from an existing user against a contract.</div>
-        <div class="form-group">
-          <label>Contract Address</label>
-          <input type="text" id="lt-contract" placeholder="0x project contract" />
-        </div>
-        <div class="form-group">
-          <label>Wallet (caller)</label>
-          <input type="text" id="lt-wallet" placeholder="0x wallet" />
-        </div>
-        <div class="form-group">
-          <label>Action</label>
-          <select id="lt-action">
-            <option>Transfer</option>
-            <option>Stake</option>
-            <option>Withdraw</option>
-            <option>Vote</option>
-            <option>Claim</option>
-            <option>Custom</option>
-          </select>
-        </div>
-        <button class="btn primary" onclick="logTx()">Log Transaction</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════
-       CONTRACT CODE
-  ═══════════════════════════════════════════ -->
-  <section class="section" id="code">
-    <div class="section-title">ContractTrack.sol</div>
-    <p class="section-sub">Deploy once. Projects call <code style="font-family:var(--mono);color:var(--accent)">registerContract()</code> once, then push activity via <code style="font-family:var(--mono);color:var(--accent)">logUser()</code> and <code style="font-family:var(--mono);color:var(--accent)">logTx()</code>. Anyone queries with the view functions.</p>
-
-    <div class="solidity-block">
-      <button class="copy-btn" onclick="copyContract()">Copy</button>
-<pre id="sol-code">// SPDX-License-Identifier: MIT
-<span class="kw">pragma</span> solidity ^0.8.20;
-
-<span class="cm">/// @title  ContractTrack
-/// @notice Public analytics registry. Projects register their contracts,
-///         then push user and tx activity onchain. Anyone can query.
-/// @dev    Deploy once; no ownership required for logging — any caller
-///         can push data for a registered contract.</span>
-<span class="kw">contract</span> <span class="type">ContractTrack</span> {
-
-    <span class="cm">// ─── Data structures ───────────────────────────────────────</span>
-
-    <span class="kw">struct</span> <span class="type">ContractInfo</span> {
-        <span class="type">address</span> contractAddr;
-        <span class="type">string</span>  name;
-        <span class="type">string</span>  category;
-        <span class="type">string</span>  description;
-        <span class="type">address</span> registeredBy;
-        <span class="type">uint256</span> registeredAt;
-        <span class="kw">bool</span>    exists;
-    }
-
-    <span class="kw">struct</span> <span class="type">UserRecord</span> {
-        <span class="type">address</span> wallet;
-        <span class="type">string</span>  eventType;   <span class="cm">// e.g. "Registration", "FirstTx"</span>
-        <span class="type">uint256</span> firstSeenAt;
-        <span class="type">uint256</span> txCount;      <span class="cm">// txs this wallet made on this contract</span>
-    }
-
-    <span class="kw">struct</span> <span class="type">TxRecord</span> {
-        <span class="type">address</span> wallet;
-        <span class="type">string</span>  action;
-        <span class="type">uint256</span> timestamp;
-        <span class="type">uint256</span> blockNumber;
-    }
-
-    <span class="kw">struct</span> <span class="type">Stats</span> {
-        <span class="type">uint256</span> totalUsers;   <span class="cm">// all logUser() calls</span>
-        <span class="type">uint256</span> uniqueWallets;<span class="cm">// distinct wallet addresses</span>
-        <span class="type">uint256</span> totalTxs;     <span class="cm">// all logTx() calls</span>
-        <span class="type">uint256</span> eventCount;   <span class="cm">// all events emitted</span>
-    }
-
-    <span class="cm">// ─── Storage ───────────────────────────────────────────────</span>
-
-    <span class="cm">// contractAddr => metadata</span>
-    <span class="kw">mapping</span>(<span class="type">address</span> => <span class="type">ContractInfo</span>) <span class="kw">public</span> contracts;
-
-    <span class="cm">// contractAddr => stats</span>
-    <span class="kw">mapping</span>(<span class="type">address</span> => <span class="type">Stats</span>) <span class="kw">public</span> stats;
-
-    <span class="cm">// contractAddr => wallet => UserRecord</span>
-    <span class="kw">mapping</span>(<span class="type">address</span> => <span class="kw">mapping</span>(<span class="type">address</span> => <span class="type">UserRecord</span>)) <span class="kw">public</span> userRecords;
-
-    <span class="cm">// contractAddr => list of unique wallet addresses</span>
-    <span class="kw">mapping</span>(<span class="type">address</span> => <span class="type">address</span>[]) <span class="kw">public</span> contractWallets;
-
-    <span class="cm">// contractAddr => tx history</span>
-    <span class="kw">mapping</span>(<span class="type">address</span> => <span class="type">TxRecord</span>[]) <span class="kw">public</span> txHistory;
-
-    <span class="cm">// all registered contract addresses</span>
-    <span class="type">address</span>[] <span class="kw">public</span> registeredContracts;
-
-    <span class="cm">// ─── Events ────────────────────────────────────────────────</span>
-
-    <span class="kw">event</span> <span class="fn">ContractRegistered</span>(
-        <span class="type">address</span> <span class="kw">indexed</span> contractAddr,
-        <span class="type">string</span> name,
-        <span class="type">address</span> registeredBy
-    );
-    <span class="kw">event</span> <span class="fn">UserLogged</span>(
-        <span class="type">address</span> <span class="kw">indexed</span> contractAddr,
-        <span class="type">address</span> <span class="kw">indexed</span> wallet,
-        <span class="type">string</span> eventType,
-        <span class="type">bool</span> isNew
-    );
-    <span class="kw">event</span> <span class="fn">TxLogged</span>(
-        <span class="type">address</span> <span class="kw">indexed</span> contractAddr,
-        <span class="type">address</span> <span class="kw">indexed</span> wallet,
-        <span class="type">string</span> action,
-        <span class="type">uint256</span> blockNumber
-    );
-
-    <span class="cm">// ─── Registration ──────────────────────────────────────────</span>
-
-    <span class="kw">function</span> <span class="fn">registerContract</span>(
-        <span class="type">address</span> contractAddr,
-        <span class="type">string</span> <span class="kw">calldata</span> name,
-        <span class="type">string</span> <span class="kw">calldata</span> category,
-        <span class="type">string</span> <span class="kw">calldata</span> description
-    ) <span class="kw">external</span> {
-        <span class="kw">require</span>(!contracts[contractAddr].exists, <span class="str">"Already registered"</span>);
-        <span class="kw">require</span>(bytes(name).length > 0, <span class="str">"Name required"</span>);
-
-        contracts[contractAddr] = <span class="type">ContractInfo</span>({
-            contractAddr: contractAddr,
-            name: name,
-            category: category,
-            description: description,
-            registeredBy: msg.sender,
-            registeredAt: block.timestamp,
-            exists: <span class="kw">true</span>
-        });
-
-        registeredContracts.push(contractAddr);
-        <span class="kw">emit</span> <span class="fn">ContractRegistered</span>(contractAddr, name, msg.sender);
-    }
-
-    <span class="cm">// ─── Activity logging ──────────────────────────────────────</span>
-
-    <span class="cm">/// @notice Log a user interaction. Increments uniqueWallets only on first call per wallet.</span>
-    <span class="kw">function</span> <span class="fn">logUser</span>(
-        <span class="type">address</span> contractAddr,
-        <span class="type">address</span> wallet,
-        <span class="type">string</span> <span class="kw">calldata</span> eventType
-    ) <span class="kw">external</span> {
-        <span class="kw">require</span>(contracts[contractAddr].exists, <span class="str">"Contract not registered"</span>);
-
-        <span class="type">Stats</span> <span class="kw">storage</span> s = stats[contractAddr];
-        <span class="type">UserRecord</span> <span class="kw">storage</span> u = userRecords[contractAddr][wallet];
-
-        <span class="kw">bool</span> isNew = u.firstSeenAt == 0;
-        <span class="kw">if</span> (isNew) {
-            userRecords[contractAddr][wallet] = <span class="type">UserRecord</span>({
-                wallet: wallet,
-                eventType: eventType,
-                firstSeenAt: block.timestamp,
-                txCount: 1
-            });
-            contractWallets[contractAddr].push(wallet);
-            s.uniqueWallets++;
-        } <span class="kw">else</span> {
-            u.txCount++;
-        }
-
-        s.totalUsers++;
-        s.eventCount++;
-
-        <span class="kw">emit</span> <span class="fn">UserLogged</span>(contractAddr, wallet, eventType, isNew);
-    }
-
-    <span class="cm">/// @notice Log a transaction from a wallet against a contract.</span>
-    <span class="kw">function</span> <span class="fn">logTx</span>(
-        <span class="type">address</span> contractAddr,
-        <span class="type">address</span> wallet,
-        <span class="type">string</span> <span class="kw">calldata</span> action
-    ) <span class="kw">external</span> {
-        <span class="kw">require</span>(contracts[contractAddr].exists, <span class="str">"Contract not registered"</span>);
-
-        txHistory[contractAddr].push(<span class="type">TxRecord</span>({
-            wallet: wallet,
-            action: action,
-            timestamp: block.timestamp,
-            blockNumber: block.number
-        }));
-
-        stats[contractAddr].totalTxs++;
-        stats[contractAddr].eventCount++;
-
-        <span class="cm">// bump per-wallet tx count if user is known</span>
-        <span class="kw">if</span> (userRecords[contractAddr][wallet].firstSeenAt != 0) {
-            userRecords[contractAddr][wallet].txCount++;
-        }
-
-        <span class="kw">emit</span> <span class="fn">TxLogged</span>(contractAddr, wallet, action, block.number);
-    }
-
-    <span class="cm">// ─── Query functions (all free, public) ────────────────────</span>
-
-    <span class="cm">/// @notice Get full stats for a contract in one call.</span>
-    <span class="kw">function</span> <span class="fn">getStats</span>(<span class="type">address</span> contractAddr)
-        <span class="kw">external</span> <span class="kw">view</span>
-        <span class="kw">returns</span> (
-            <span class="type">uint256</span> totalUsers,
-            <span class="type">uint256</span> uniqueWallets,
-            <span class="type">uint256</span> totalTxs,
-            <span class="type">uint256</span> eventCount
-        )
-    {
-        <span class="type">Stats</span> <span class="kw">memory</span> s = stats[contractAddr];
-        <span class="kw">return</span> (s.totalUsers, s.uniqueWallets, s.totalTxs, s.eventCount);
-    }
-
-    <span class="cm">/// @notice Check if a contract has been used at all.</span>
-    <span class="kw">function</span> <span class="fn">hasUsers</span>(<span class="type">address</span> contractAddr) <span class="kw">external</span> <span class="kw">view</span> <span class="kw">returns</span> (<span class="kw">bool</span>) {
-        <span class="kw">return</span> stats[contractAddr].uniqueWallets > 0;
-    }
-
-    <span class="cm">/// @notice Get all unique wallet addresses for a contract.</span>
-    <span class="kw">function</span> <span class="fn">getWallets</span>(<span class="type">address</span> contractAddr)
-        <span class="kw">external</span> <span class="kw">view</span> <span class="kw">returns</span> (<span class="type">address</span>[] <span class="kw">memory</span>)
-    {
-        <span class="kw">return</span> contractWallets[contractAddr];
-    }
-
-    <span class="cm">/// @notice Get the per-wallet tx count for a specific address.</span>
-    <span class="kw">function</span> <span class="fn">getWalletTxCount</span>(<span class="type">address</span> contractAddr, <span class="type">address</span> wallet)
-        <span class="kw">external</span> <span class="kw">view</span> <span class="kw">returns</span> (<span class="type">uint256</span>)
-    {
-        <span class="kw">return</span> userRecords[contractAddr][wallet].txCount;
-    }
-
-    <span class="cm">/// @notice Get paginated tx history for a contract.</span>
-    <span class="kw">function</span> <span class="fn">getTxHistory</span>(
-        <span class="type">address</span> contractAddr,
-        <span class="type">uint256</span> offset,
-        <span class="type">uint256</span> limit
-    ) <span class="kw">external</span> <span class="kw">view</span> <span class="kw">returns</span> (<span class="type">TxRecord</span>[] <span class="kw">memory</span> page) {
-        <span class="type">TxRecord</span>[] <span class="kw">storage</span> all = txHistory[contractAddr];
-        <span class="type">uint256</span> end = offset + limit > all.length ? all.length : offset + limit;
-        page = <span class="kw">new</span> <span class="type">TxRecord</span>[](end - offset);
-        <span class="kw">for</span> (<span class="type">uint256</span> i = offset; i < end; i++) {
-            page[i - offset] = all[i];
-        }
-    }
-
-    <span class="cm">/// @notice Get all registered contract addresses.</span>
-    <span class="kw">function</span> <span class="fn">getAllContracts</span>() <span class="kw">external</span> <span class="kw">view</span> <span class="kw">returns</span> (<span class="type">address</span>[] <span class="kw">memory</span>) {
-        <span class="kw">return</span> registeredContracts;
-    }
-
-    <span class="cm">/// @notice Get metadata for a contract.</span>
-    <span class="kw">function</span> <span class="fn">getContractInfo</span>(<span class="type">address</span> contractAddr)
-        <span class="kw">external</span> <span class="kw">view</span> <span class="kw">returns</span> (<span class="type">ContractInfo</span> <span class="kw">memory</span>)
-    {
-        <span class="kw">return</span> contracts[contractAddr];
-    }
-}</pre>
-    </div>
-
-    <div class="panel" style="margin-top:16px;">
-      <div class="info-row"><span class="info-key">Register</span><span class="info-val">registerContract(addr, name, category, desc)</span></div>
-      <div class="info-row"><span class="info-key">Log user</span><span class="info-val">logUser(contractAddr, wallet, eventType)</span></div>
-      <div class="info-row"><span class="info-key">Log tx</span><span class="info-val">logTx(contractAddr, wallet, action)</span></div>
-      <div class="info-row"><span class="info-key">Query stats</span><span class="info-val">getStats(contractAddr) → totalUsers, uniqueWallets, totalTxs, eventCount</span></div>
-      <div class="info-row"><span class="info-key">Query wallets</span><span class="info-val">getWallets(contractAddr) → address[]</span></div>
-      <div class="info-row"><span class="info-key">Query history</span><span class="info-val">getTxHistory(contractAddr, offset, limit) → TxRecord[]</span></div>
-      <div class="info-row"><span class="info-key">Network</span><span class="info-val">Any EVM — Celo / Base / Ethereum</span></div>
-    </div>
-  </section>
+  </div>
+</section>
 
 </main>
-
 <div id="toast"></div>
-
 <script>
-// ── Demo state ──────────────────────────────────────────────
-const registry = {}; // addr => { info, stats, wallets: {addr: record}, txHistory: [] }
+// ── Config ──────────────────────────────────────────────────────
+const CHAIN_ID  = 968;
+const RPC_URL   = 'https://rpc.bohr.life';
+const SCAN_URL  = 'https://scan.bohr.life';
+const CONTRACT_ADDRESS = '0x44bDf499567bFF511333aD2c5427B7775ba31b22'; // replace after deploy
 
-// Seed some demo data
-function seed() {
-  const contracts = [
-    { addr: '0xFAUCET00faucetdrops0000000000000000001',  name: 'FaucetDrops',  cat: 'Infrastructure', desc: 'Multi-chain faucet platform' },
-    { addr: '0xHEALFI00healfi000000000000000000000002',  name: 'HealFi',       cat: 'DeFi',           desc: 'Healthcare savings on Celo' },
-    { addr: '0xPRIMEIQ00primeiq00000000000000000000003', name: 'PrimeIQ',      cat: 'Gaming',         desc: 'Quiz dueling platform' },
-  ];
-  const wallets = [
-    '0xAlice00000000000000000000000000000001',
-    '0xBob000000000000000000000000000000002',
-    '0xCarol0000000000000000000000000000003',
-    '0xDave00000000000000000000000000000004',
-    '0xEve000000000000000000000000000000005',
-  ];
-  const actions = ['Transfer','Stake','Claim','Deposit','Withdraw','Vote','Mint'];
-  const events  = ['Registration','FirstTx','Deposit','Swap','Mint'];
+const ABI = [
+  "function registerContract(address,string,string,string) external",
+  "function logUser(address,address,string) external",
+  "function logTx(address,address,string) external",
+  "function getStats(address) view returns (uint256,uint256,uint256,uint256)",
+  "function hasUsers(address) view returns (bool)",
+  "function getWallets(address) view returns (address[])",
+  "function getTxHistory(address,uint256,uint256) view returns (tuple(address wallet,string action,uint256 timestamp,uint256 blockNumber)[])",
+  "function getContractInfo(address) view returns (tuple(address contractAddr,string name,string category,string description,address registeredBy,uint256 registeredAt,bool exists))",
+  "function getAllContracts() view returns (address[])",
+  "function contracts(address) view returns (address,string,string,string,address,uint256,bool)"
+];
 
-  contracts.forEach(c => {
-    registry[c.addr] = {
-      info: { name: c.name, category: c.cat, desc: c.desc, by: '0xDeployer...', at: Date.now() - 86400000*7 },
-      stats: { totalUsers: 0, uniqueWallets: 0, totalTxs: 0, eventCount: 0 },
-      wallets: {},
-      txHistory: []
-    };
-    // add 3-5 wallets
-    const wCount = 3 + Math.floor(Math.random()*3);
-    wallets.slice(0, wCount).forEach((w, i) => {
-      const txCount = 2 + Math.floor(Math.random()*8);
-      registry[c.addr].wallets[w] = { wallet: w, eventType: events[i%events.length], firstSeenAt: Date.now() - 86400000*(6-i), txCount };
-      registry[c.addr].stats.uniqueWallets++;
-      registry[c.addr].stats.totalUsers += txCount;
-      registry[c.addr].stats.eventCount += txCount;
-      for (let t = 0; t < txCount; t++) {
-        registry[c.addr].txHistory.push({
-          wallet: w, action: actions[Math.floor(Math.random()*actions.length)],
-          timestamp: Date.now() - Math.random()*86400000*6, blockNumber: 19000000 + Math.floor(Math.random()*50000)
-        });
-        registry[c.addr].stats.totalTxs++;
+const BOTCHAIN = {
+  chainId: '0x' + CHAIN_ID.toString(16),
+  chainName: 'Botchain',
+  nativeCurrency: { name: 'BOT', symbol: 'BOT', decimals: 18 },
+  rpcUrls: [RPC_URL],
+  blockExplorerUrls: [SCAN_URL]
+};
+
+let provider, signer, contract, userAddress;
+
+// ── Wallet ──────────────────────────────────────────────────────
+async function connectWallet() {
+  if (!window.ethereum) { toast('No wallet detected. Install MetaMask.', true); return; }
+  try {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== CHAIN_ID) {
+      try {
+        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BOTCHAIN.chainId }] });
+      } catch (e) {
+        if (e.code === 4902) {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [BOTCHAIN] });
+        }
       }
-    });
-    registry[c.addr].txHistory.sort((a,b) => b.timestamp - a.timestamp);
-  });
+      provider = new ethers.BrowserProvider(window.ethereum);
+    }
+    signer      = await provider.getSigner();
+    userAddress = await signer.getAddress();
+    contract    = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    document.getElementById('wb').textContent = short(userAddress);
+    document.getElementById('wb').classList.add('connected');
+    document.getElementById('reg-network').style.display = 'flex';
+    toast('Connected to Botchain');
+  } catch (e) { toast(e.message, true); }
 }
-seed();
 
-// ── Helpers ─────────────────────────────────────────────────
-function shortAddr(a) { return a.slice(0,8)+'...'+a.slice(-6); }
-function timeAgo(ts) {
-  const d = (Date.now() - ts) / 1000;
-  if (d < 60) return Math.floor(d)+'s ago';
-  if (d < 3600) return Math.floor(d/60)+'m ago';
-  if (d < 86400) return Math.floor(d/3600)+'h ago';
-  return Math.floor(d/86400)+'d ago';
-}
-function toast(msg) {
+// ── Helpers ─────────────────────────────────────────────────────
+function short(a) { return a.slice(0,6)+'…'+a.slice(-4); }
+function scanTx(h) { return `${SCAN_URL}/tx/${h}`; }
+function scanAddr(a) { return `${SCAN_URL}/address/${a}`; }
+function toast(msg, err=false) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  t.textContent = msg; t.classList.toggle('err', err);
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show','err'),3500);
+}
+function txLink(hash) {
+  return `<a class="tx-link" href="${scanTx(hash)}" target="_blank">View on Botchain Explorer ↗</a>`;
 }
 function goTab(id, btn) {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'query') renderContractList();
+}
+function readContract() {
+  const p = new ethers.JsonRpcProvider(RPC_URL);
+  return new ethers.Contract(CONTRACT_ADDRESS, ABI, p);
 }
 
-// ── Contract list ────────────────────────────────────────────
-function renderContractList() {
-  const keys = Object.keys(registry);
-  document.getElementById('contract-count').textContent = keys.length + ' contract' + (keys.length!==1?'s':'');
-  const el = document.getElementById('contract-list');
-  if (!keys.length) { el.innerHTML = '<div class="empty">No contracts registered yet.</div>'; return; }
-  el.innerHTML = keys.map(addr => {
-    const r = registry[addr];
-    return `<div class="contract-item" onclick="quickQuery('${addr}')">
-      <div class="ci-dot"></div>
-      <div>
-        <div class="ci-name">${r.info.name}</div>
-        <div class="ci-addr">${shortAddr(addr)}</div>
-      </div>
-      <span class="badge blue" style="margin-left:8px;">${r.info.category}</span>
-      <div class="ci-stats">
-        <div>${r.stats.uniqueWallets} wallets</div>
-        <div>${r.stats.totalTxs} txs</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function quickQuery(addr) {
-  document.getElementById('q-addr').value = addr;
-  runQuery();
-}
-
-// ── Query ────────────────────────────────────────────────────
-function runQuery() {
+// ── Query ────────────────────────────────────────────────────────
+async function queryContract() {
   const addr = document.getElementById('q-addr').value.trim();
-  if (!addr) { toast('Enter a contract address.'); return; }
+  if (!ethers.isAddress(addr)) { toast('Invalid address', true); return; }
+  try {
+    const rc = readContract();
+    const [info, [tu, uw, tt, ev], wallets, history] = await Promise.all([
+      rc.getContractInfo(addr),
+      rc.getStats(addr),
+      rc.getWallets(addr),
+      rc.getTxHistory(addr, 0, 10)
+    ]);
+    if (!info.exists) { toast('Contract not registered in TxTrack', true); return; }
+    document.getElementById('q-name').textContent = info.name;
+    document.getElementById('q-cat').textContent  = info.category;
+    document.getElementById('q-tu').textContent   = tu.toString();
+    document.getElementById('q-uw').textContent   = uw.toString();
+    document.getElementById('q-tx').textContent   = tt.toString();
+    document.getElementById('q-ev').textContent   = ev.toString();
 
-  const r = registry[addr];
-  if (!r) {
-    document.getElementById('query-result').style.display = 'none';
-    toast('Contract not found in registry.');
-    return;
-  }
+    document.getElementById('q-wallets').innerHTML = wallets.length
+      ? wallets.map((w,i) => `<div class="row"><span style="color:var(--muted);font-size:11px">${i+1}</span><span class="addr"><a href="${scanAddr(w)}" target="_blank" style="color:var(--accent);text-decoration:none">${short(w)}</a></span></div>`).join('')
+      : '<div class="row" style="color:var(--muted)">No wallets yet</div>';
 
-  document.getElementById('recent-wrap').style.display = 'none';
-  document.getElementById('query-result').style.display = 'block';
+    document.getElementById('q-feed').innerHTML = history.length
+      ? [...history].reverse().map(tx => `<div class="row"><span style="font-size:13px">📋</span><div style="flex:1"><div style="font-weight:600;font-size:13px">${tx.action}</div><div class="mono" style="color:var(--muted)">${short(tx.wallet)}</div></div></div>`).join('')
+      : '<div class="row" style="color:var(--muted)">No activity yet</div>';
 
-  document.getElementById('r-name').textContent = r.info.name;
-  document.getElementById('r-addr').textContent = shortAddr(addr) + ' · ' + r.info.category;
-  document.getElementById('r-total-users').textContent = r.stats.totalUsers.toLocaleString();
-  document.getElementById('r-unique').textContent = r.stats.uniqueWallets.toLocaleString();
-  document.getElementById('r-txs').textContent = r.stats.totalTxs.toLocaleString();
-  document.getElementById('r-events').textContent = r.stats.eventCount.toLocaleString();
-
-  // users table
-  const wallets = Object.values(r.wallets);
-  const tbody = document.getElementById('r-user-tbody');
-  if (!wallets.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No users yet</td></tr>';
-  } else {
-    tbody.innerHTML = wallets.map((w, i) => `
-      <tr>
-        <td class="mono" style="color:var(--muted);">${i+1}</td>
-        <td class="addr-cell">${shortAddr(w.wallet)}</td>
-        <td class="mono">${w.txCount}</td>
-        <td class="mono" style="color:var(--muted);">${timeAgo(w.firstSeenAt)}</td>
-      </tr>`).join('');
-  }
-
-  // activity feed
-  const feed = document.getElementById('r-feed');
-  const txs = r.txHistory.slice(0, 12);
-  if (!txs.length) {
-    feed.innerHTML = '<div class="empty">No activity yet.</div>';
-  } else {
-    const iconMap = { Transfer:'💸', Stake:'🔒', Claim:'🎁', Deposit:'⬇️', Withdraw:'⬆️', Vote:'🗳️', Mint:'✨', Registration:'👤', FirstTx:'⚡' };
-    feed.innerHTML = txs.map(tx => `
-      <div class="activity-row">
-        <div class="act-icon tx">${iconMap[tx.action] || '📋'}</div>
-        <div class="act-main">
-          <div class="act-type">${tx.action}</div>
-          <div class="act-addr">${shortAddr(tx.wallet)} · block ${tx.blockNumber.toLocaleString()}</div>
-        </div>
-        <div class="act-time">${timeAgo(tx.timestamp)}</div>
-      </div>`).join('');
-  }
+    document.getElementById('q-result').style.display = 'block';
+  } catch(e) { toast('Query failed: ' + e.message, true); }
 }
 
-// ── Register contract ────────────────────────────────────────
-function registerContract() {
-  const addr = document.getElementById('r-contract-addr').value.trim();
-  const name = document.getElementById('r-project-name').value.trim();
-  const cat  = document.getElementById('r-category').value;
+// ── Register ─────────────────────────────────────────────────────
+async function registerContract() {
+  if (!signer) { toast('Connect wallet first', true); return; }
+  const addr = document.getElementById('r-addr').value.trim();
+  const name = document.getElementById('r-name').value.trim();
+  const cat  = document.getElementById('r-cat').value;
   const desc = document.getElementById('r-desc').value.trim();
-  if (!addr || !name || !cat) { toast('Fill in address, name, and category.'); return; }
-  if (registry[addr]) { toast('Already registered.'); return; }
-  registry[addr] = {
-    info: { name, category: cat, desc, by: '0xYou...', at: Date.now() },
-    stats: { totalUsers: 0, uniqueWallets: 0, totalTxs: 0, eventCount: 0 },
-    wallets: {}, txHistory: []
-  };
-  ['r-contract-addr','r-project-name','r-desc'].forEach(id => document.getElementById(id).value='');
-  document.getElementById('r-category').value = '';
-  toast(`${name} registered!`);
-  renderContractList();
+  if (!ethers.isAddress(addr) || !name || !cat) { toast('Fill in all fields with a valid address', true); return; }
+  try {
+    const btn = document.getElementById('r-btn');
+    btn.disabled = true; btn.textContent = 'Sending tx…';
+    const tx = await contract.registerContract(addr, name, cat, desc);
+    const el = document.getElementById('r-tx');
+    el.style.display = 'block';
+    el.innerHTML = `Pending… ${txLink(tx.hash)}`;
+    await tx.wait();
+    el.innerHTML = `✅ Registered! ${txLink(tx.hash)}`;
+    btn.disabled = false; btn.textContent = 'Register Contract';
+    toast(`${name} registered on Botchain`);
+  } catch(e) { toast(e.reason || e.message, true); document.getElementById('r-btn').disabled=false; document.getElementById('r-btn').textContent='Register Contract'; }
 }
 
-// ── Log activity ─────────────────────────────────────────────
-function logUser() {
-  const addr   = document.getElementById('lu-contract').value.trim();
-  const wallet = document.getElementById('lu-wallet').value.trim();
-  const type   = document.getElementById('lu-type').value;
-  if (!addr || !wallet) { toast('Enter contract address and wallet.'); return; }
-  if (!registry[addr]) { toast('Contract not registered.'); return; }
-
-  const r = registry[addr];
-  const isNew = !r.wallets[wallet];
-  if (isNew) {
-    r.wallets[wallet] = { wallet, eventType: type, firstSeenAt: Date.now(), txCount: 1 };
-    r.stats.uniqueWallets++;
-  } else {
-    r.wallets[wallet].txCount++;
-  }
-  r.stats.totalUsers++;
-  r.stats.eventCount++;
-  toast(`User ${isNew ? 'added (new unique wallet)' : 'tx count incremented'} — ${r.info.name}`);
-  document.getElementById('lu-contract').value = '';
-  document.getElementById('lu-wallet').value = '';
+// ── Log User ─────────────────────────────────────────────────────
+async function logUser() {
+  if (!signer) { toast('Connect wallet first', true); return; }
+  const c = document.getElementById('lu-c').value.trim();
+  const w = document.getElementById('lu-w').value.trim();
+  const t = document.getElementById('lu-t').value;
+  if (!ethers.isAddress(c) || !ethers.isAddress(w)) { toast('Invalid addresses', true); return; }
+  try {
+    const tx = await contract.logUser(c, w, t);
+    const el = document.getElementById('lu-tx');
+    el.style.display='block'; el.innerHTML=`Pending… ${txLink(tx.hash)}`;
+    await tx.wait();
+    el.innerHTML = `✅ Logged! ${txLink(tx.hash)}`;
+    toast('User logged on Botchain');
+  } catch(e) { toast(e.reason || e.message, true); }
 }
 
-function logTx() {
-  const addr   = document.getElementById('lt-contract').value.trim();
-  const wallet = document.getElementById('lt-wallet').value.trim();
-  const action = document.getElementById('lt-action').value;
-  if (!addr || !wallet) { toast('Enter contract address and wallet.'); return; }
-  if (!registry[addr]) { toast('Contract not registered.'); return; }
-
-  const r = registry[addr];
-  r.txHistory.unshift({ wallet, action, timestamp: Date.now(), blockNumber: 19050000 + r.stats.totalTxs });
-  r.stats.totalTxs++;
-  r.stats.eventCount++;
-  if (r.wallets[wallet]) r.wallets[wallet].txCount++;
-  toast(`Tx logged — ${action} on ${r.info.name}`);
-  document.getElementById('lt-contract').value = '';
-  document.getElementById('lt-wallet').value = '';
+// ── Log Tx ───────────────────────────────────────────────────────
+async function logTx() {
+  if (!signer) { toast('Connect wallet first', true); return; }
+  const c = document.getElementById('lt-c').value.trim();
+  const w = document.getElementById('lt-w').value.trim();
+  const a = document.getElementById('lt-a').value;
+  if (!ethers.isAddress(c) || !ethers.isAddress(w)) { toast('Invalid addresses', true); return; }
+  try {
+    const tx = await contract.logTx(c, w, a);
+    const el = document.getElementById('lt-tx');
+    el.style.display='block'; el.innerHTML=`Pending… ${txLink(tx.hash)}`;
+    await tx.wait();
+    el.innerHTML = `✅ Logged! ${txLink(tx.hash)}`;
+    toast('Transaction logged on Botchain');
+  } catch(e) { toast(e.reason || e.message, true); }
 }
 
-function copyContract() {
-  navigator.clipboard.writeText(document.getElementById('sol-code').innerText)
-    .then(() => toast('Contract copied!'));
-}
-
-// init
-renderContractList();
+// auto-reconnect
+window.addEventListener('load', () => { if (window.ethereum?.selectedAddress) connectWallet(); });
+window.ethereum?.on('accountsChanged', ()=>connectWallet());
+window.ethereum?.on('chainChanged', ()=>location.reload());
 </script>
+
+<footer style="border-top:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--bg);margin-top:40px">
+  <a href="https://botchain.ai" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;text-decoration:none">
+    <img src="https://botchain.ai/favicon.ico" alt="Botchain" width="20" height="20" style="border-radius:4px;object-fit:contain" onerror="this.style.display='none'"/>
+    <span style="font-weight:700;font-size:13px;color:var(--text)">Botchain</span>
+  </a>
+  <span style="color:var(--border)">|</span>
+  <a href="https://botchain.ai" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">botchain.ai &#x2197;</a>
+  <a href="https://scan.bohr.life" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">scan.bohr.life &#x2197;</a>
+  <a href="https://rpc.bohr.life" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">rpc.bohr.life &#x2197;</a>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+    <div style="width:7px;height:7px;border-radius:50%;background:#3fb950"></div>
+    <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Chain ID 968</span>
+  </div>
+</footer>
 </body>
 </html>
