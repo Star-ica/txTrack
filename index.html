@@ -104,7 +104,7 @@
 <section class="section" id="register">
   <div class="h2">Register a Contract</div>
   <p class="sub">Add your project to TxTrack. Once registered, anyone can push activity and query it publicly on Botchain.</p>
-  <div id="reg-network" class="network-bar" style="display:none"><div class="dot"></div>Connected to Botchain (Chain 968)</div>
+  <div id="reg-network" class="network-bar" style="display:none"><div class="dot"></div>Connected to Botchain (Chain 677)</div>
   <div class="form-group"><label>Contract Address to Track</label><input id="r-addr" placeholder="0x your project contract" /></div>
   <div class="grid-2">
     <div class="form-group"><label>Project Name</label><input id="r-name" placeholder="TxTrack, HealFi, etc." /></div>
@@ -151,10 +151,10 @@
 <div id="toast"></div>
 <script>
 // ── Config ──────────────────────────────────────────────────────
-const CHAIN_ID  = 968;
-const RPC_URL   = 'https://rpc.bohr.life';
-const SCAN_URL  = 'https://scan.bohr.life';
-const CONTRACT_ADDRESS = '0x44bDf499567bFF511333aD2c5427B7775ba31b22'; // replace after deploy
+const CHAIN_ID  = 677;
+const RPC_URL   = 'https://rpc.botchain.ai';
+const SCAN_URL  = 'https://scan.botchain.ai';
+const CONTRACT_ADDRESS = '0x10814dE59FFf2EF7d6488Dd69bf4c1652d29Ae12'; // replace after deploy
 
 const ABI = [
   "function registerContract(address,string,string,string) external",
@@ -330,11 +330,11 @@ window.ethereum?.on('chainChanged', ()=>location.reload());
   </a>
   <span style="color:var(--border)">|</span>
   <a href="https://botchain.ai" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">botchain.ai &#x2197;</a>
-  <a href="https://scan.bohr.life" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">scan.bohr.life &#x2197;</a>
-  <a href="https://rpc.bohr.life" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">rpc.bohr.life &#x2197;</a>
+  <a href="https://scan.botchain.ai" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">scan.botchain.ai &#x2197;</a>
+  <a href="https://rpc.botchain.ai" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:var(--mono)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">rpc.botchain.ai &#x2197;</a>
   <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
     <div style="width:7px;height:7px;border-radius:50%;background:#3fb950"></div>
-    <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Chain ID 968</span>
+    <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Chain ID 677</span>
   </div>
 </footer>
 </body>
